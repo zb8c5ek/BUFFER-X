@@ -3,6 +3,16 @@
 #include "grid_subsampling/grid_subsampling.h"
 #include <string>
 
+// Numpy 2.x compatibility
+#ifndef NPY_IN_ARRAY
+#define NPY_IN_ARRAY NPY_ARRAY_IN_ARRAY
+#endif
+
+// Helper macros for numpy 2.x (requires PyArrayObject* instead of PyObject*)
+#define PYARRAY_DATA(o)      PyArray_DATA((PyArrayObject*)(o))
+#define PYARRAY_NDIM(o)      PyArray_NDIM((PyArrayObject*)(o))
+#define PYARRAY_DIM(o, i)    PyArray_DIM((PyArrayObject*)(o), (i))
+
 
 
 // docstrings for our module
@@ -155,7 +165,7 @@ static PyObject* batch_subsampling(PyObject* self, PyObject* args, PyObject* key
 	}
 
 	// Check that the input array respect the dims
-	if ((int)PyArray_NDIM(points_array) != 2 || (int)PyArray_DIM(points_array, 1) != 3)
+	if ((int)PYARRAY_NDIM(points_array) != 2 || (int)PYARRAY_DIM(points_array, 1) != 3)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(batches_array);
@@ -164,7 +174,7 @@ static PyObject* batch_subsampling(PyObject* self, PyObject* args, PyObject* key
 		PyErr_SetString(PyExc_RuntimeError, "Wrong dimensions : points.shape is not (N, 3)");
 		return NULL;
 	}
-	if ((int)PyArray_NDIM(batches_array) > 1)
+	if ((int)PYARRAY_NDIM(batches_array) > 1)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(batches_array);
@@ -173,7 +183,7 @@ static PyObject* batch_subsampling(PyObject* self, PyObject* args, PyObject* key
 		PyErr_SetString(PyExc_RuntimeError, "Wrong dimensions : batches.shape is not (B,) ");
 		return NULL;
 	}
-	if (use_feature && ((int)PyArray_NDIM(features_array) != 2))
+	if (use_feature && ((int)PYARRAY_NDIM(features_array) != 2))
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(batches_array);
@@ -183,7 +193,7 @@ static PyObject* batch_subsampling(PyObject* self, PyObject* args, PyObject* key
 		return NULL;
 	}
 
-	if (use_classes && (int)PyArray_NDIM(classes_array) > 2)
+	if (use_classes && (int)PYARRAY_NDIM(classes_array) > 2)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(batches_array);
@@ -194,23 +204,23 @@ static PyObject* batch_subsampling(PyObject* self, PyObject* args, PyObject* key
 	}
 
 	// Number of points
-	int N = (int)PyArray_DIM(points_array, 0);
+	int N = (int)PYARRAY_DIM(points_array, 0);
 
 	// Number of batches
-	int Nb = (int)PyArray_DIM(batches_array, 0);
+	int Nb = (int)PYARRAY_DIM(batches_array, 0);
 
 	// Dimension of the features
 	int fdim = 0;
 	if (use_feature)
-		fdim = (int)PyArray_DIM(features_array, 1);
+		fdim = (int)PYARRAY_DIM(features_array, 1);
 
 	//Dimension of labels
 	int ldim = 1;
-	if (use_classes && (int)PyArray_NDIM(classes_array) == 2)
-		ldim = (int)PyArray_DIM(classes_array, 1);
+	if (use_classes && (int)PYARRAY_NDIM(classes_array) == 2)
+		ldim = (int)PYARRAY_DIM(classes_array, 1);
 
 	// Check that the input array respect the number of points
-	if (use_feature && (int)PyArray_DIM(features_array, 0) != N)
+	if (use_feature && (int)PYARRAY_DIM(features_array, 0) != N)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(batches_array);
@@ -219,7 +229,7 @@ static PyObject* batch_subsampling(PyObject* self, PyObject* args, PyObject* key
 		PyErr_SetString(PyExc_RuntimeError, "Wrong dimensions : features.shape is not (N, d)");
 		return NULL;
 	}
-	if (use_classes && (int)PyArray_DIM(classes_array, 0) != N)
+	if (use_classes && (int)PYARRAY_DIM(classes_array, 0) != N)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(batches_array);
@@ -243,12 +253,12 @@ static PyObject* batch_subsampling(PyObject* self, PyObject* args, PyObject* key
 	vector<int> original_batches;
 	vector<float> original_features;
 	vector<int> original_classes;
-	original_points = vector<PointXYZ>((PointXYZ*)PyArray_DATA(points_array), (PointXYZ*)PyArray_DATA(points_array) + N);
-	original_batches = vector<int>((int*)PyArray_DATA(batches_array), (int*)PyArray_DATA(batches_array) + Nb);
+	original_points = vector<PointXYZ>((PointXYZ*)PYARRAY_DATA(points_array), (PointXYZ*)PYARRAY_DATA(points_array) + N);
+	original_batches = vector<int>((int*)PYARRAY_DATA(batches_array), (int*)PYARRAY_DATA(batches_array) + Nb);
 	if (use_feature)
-		original_features = vector<float>((float*)PyArray_DATA(features_array), (float*)PyArray_DATA(features_array) + N * fdim);
+		original_features = vector<float>((float*)PYARRAY_DATA(features_array), (float*)PYARRAY_DATA(features_array) + N * fdim);
 	if (use_classes)
-		original_classes = vector<int>((int*)PyArray_DATA(classes_array), (int*)PyArray_DATA(classes_array) + N * ldim);
+		original_classes = vector<int>((int*)PYARRAY_DATA(classes_array), (int*)PYARRAY_DATA(classes_array) + N * ldim);
 
 	// Subsample
 	vector<PointXYZ> subsampled_points;
@@ -298,20 +308,20 @@ static PyObject* batch_subsampling(PyObject* self, PyObject* args, PyObject* key
 
 	// Fill output array with values
 	size_t size_in_bytes = subsampled_points.size() * 3 * sizeof(float);
-	memcpy(PyArray_DATA(res_points_obj), subsampled_points.data(), size_in_bytes);
+	memcpy(PYARRAY_DATA(res_points_obj), subsampled_points.data(), size_in_bytes);
 	size_in_bytes = Nb * sizeof(int);
-	memcpy(PyArray_DATA(res_batches_obj), subsampled_batches.data(), size_in_bytes);
+	memcpy(PYARRAY_DATA(res_batches_obj), subsampled_batches.data(), size_in_bytes);
 	if (use_feature)
 	{
 		size_in_bytes = subsampled_points.size() * fdim * sizeof(float);
 		res_features_obj = PyArray_SimpleNew(2, feature_dims, NPY_FLOAT);
-		memcpy(PyArray_DATA(res_features_obj), subsampled_features.data(), size_in_bytes);
+		memcpy(PYARRAY_DATA(res_features_obj), subsampled_features.data(), size_in_bytes);
 	}
 	if (use_classes)
 	{
 		size_in_bytes = subsampled_points.size() * ldim * sizeof(int);
 		res_classes_obj = PyArray_SimpleNew(2, classes_dims, NPY_INT);
-		memcpy(PyArray_DATA(res_classes_obj), subsampled_classes.data(), size_in_bytes);
+		memcpy(PYARRAY_DATA(res_classes_obj), subsampled_classes.data(), size_in_bytes);
 	}
 
 
@@ -431,7 +441,7 @@ static PyObject* batch_subsampling_and_searching(PyObject* self, PyObject* args,
 	}
 
 	// Check that the input array respect the dims
-	if ((int)PyArray_NDIM(points_array) != 2 || (int)PyArray_DIM(points_array, 1) != 3)
+	if ((int)PYARRAY_NDIM(points_array) != 2 || (int)PYARRAY_DIM(points_array, 1) != 3)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(batches_array);
@@ -440,7 +450,7 @@ static PyObject* batch_subsampling_and_searching(PyObject* self, PyObject* args,
 		PyErr_SetString(PyExc_RuntimeError, "Wrong dimensions : points.shape is not (N, 3)");
 		return NULL;
 	}
-	if ((int)PyArray_NDIM(batches_array) > 1)
+	if ((int)PYARRAY_NDIM(batches_array) > 1)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(batches_array);
@@ -449,7 +459,7 @@ static PyObject* batch_subsampling_and_searching(PyObject* self, PyObject* args,
 		PyErr_SetString(PyExc_RuntimeError, "Wrong dimensions : batches.shape is not (B,) ");
 		return NULL;
 	}
-	if (use_feature && ((int)PyArray_NDIM(features_array) != 2))
+	if (use_feature && ((int)PYARRAY_NDIM(features_array) != 2))
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(batches_array);
@@ -459,7 +469,7 @@ static PyObject* batch_subsampling_and_searching(PyObject* self, PyObject* args,
 		return NULL;
 	}
 
-	if (use_classes && (int)PyArray_NDIM(classes_array) > 2)
+	if (use_classes && (int)PYARRAY_NDIM(classes_array) > 2)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(batches_array);
@@ -470,23 +480,23 @@ static PyObject* batch_subsampling_and_searching(PyObject* self, PyObject* args,
 	}
 
 	// Number of points
-	int N = (int)PyArray_DIM(points_array, 0);
+	int N = (int)PYARRAY_DIM(points_array, 0);
 
 	// Number of batches
-	int Nb = (int)PyArray_DIM(batches_array, 0);
+	int Nb = (int)PYARRAY_DIM(batches_array, 0);
 
 	// Dimension of the features
 	int fdim = 0;
 	if (use_feature)
-		fdim = (int)PyArray_DIM(features_array, 1);
+		fdim = (int)PYARRAY_DIM(features_array, 1);
 
 	//Dimension of labels
 	int ldim = 1;
-	if (use_classes && (int)PyArray_NDIM(classes_array) == 2)
-		ldim = (int)PyArray_DIM(classes_array, 1);
+	if (use_classes && (int)PYARRAY_NDIM(classes_array) == 2)
+		ldim = (int)PYARRAY_DIM(classes_array, 1);
 
 	// Check that the input array respect the number of points
-	if (use_feature && (int)PyArray_DIM(features_array, 0) != N)
+	if (use_feature && (int)PYARRAY_DIM(features_array, 0) != N)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(batches_array);
@@ -495,7 +505,7 @@ static PyObject* batch_subsampling_and_searching(PyObject* self, PyObject* args,
 		PyErr_SetString(PyExc_RuntimeError, "Wrong dimensions : features.shape is not (N, d)");
 		return NULL;
 	}
-	if (use_classes && (int)PyArray_DIM(classes_array, 0) != N)
+	if (use_classes && (int)PYARRAY_DIM(classes_array, 0) != N)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(batches_array);
@@ -519,12 +529,12 @@ static PyObject* batch_subsampling_and_searching(PyObject* self, PyObject* args,
 	vector<int> original_batches;
 	vector<float> original_features;
 	vector<int> original_classes;
-	original_points = vector<PointXYZ>((PointXYZ*)PyArray_DATA(points_array), (PointXYZ*)PyArray_DATA(points_array) + N);
-	original_batches = vector<int>((int*)PyArray_DATA(batches_array), (int*)PyArray_DATA(batches_array) + Nb);
+	original_points = vector<PointXYZ>((PointXYZ*)PYARRAY_DATA(points_array), (PointXYZ*)PYARRAY_DATA(points_array) + N);
+	original_batches = vector<int>((int*)PYARRAY_DATA(batches_array), (int*)PYARRAY_DATA(batches_array) + Nb);
 	if (use_feature)
-		original_features = vector<float>((float*)PyArray_DATA(features_array), (float*)PyArray_DATA(features_array) + N * fdim);
+		original_features = vector<float>((float*)PYARRAY_DATA(features_array), (float*)PYARRAY_DATA(features_array) + N * fdim);
 	if (use_classes)
-		original_classes = vector<int>((int*)PyArray_DATA(classes_array), (int*)PyArray_DATA(classes_array) + N * ldim);
+		original_classes = vector<int>((int*)PYARRAY_DATA(classes_array), (int*)PYARRAY_DATA(classes_array) + N * ldim);
 
 	// Subsample
 	vector<PointXYZ> subsampled_points;
@@ -583,23 +593,23 @@ static PyObject* batch_subsampling_and_searching(PyObject* self, PyObject* args,
 
 	// Fill output array with values
 	size_t size_in_bytes = subsampled_points.size() * 3 * sizeof(float);
-	memcpy(PyArray_DATA(res_points_obj), subsampled_points.data(), size_in_bytes);
+	memcpy(PYARRAY_DATA(res_points_obj), subsampled_points.data(), size_in_bytes);
 	size_in_bytes = Nb * sizeof(int);
-	memcpy(PyArray_DATA(res_batches_obj), subsampled_batches.data(), size_in_bytes);
+	memcpy(PYARRAY_DATA(res_batches_obj), subsampled_batches.data(), size_in_bytes);
   size_in_bytes = original_points.size() * max_neighbors * sizeof(int);
-	memcpy(PyArray_DATA(res_indices_obj), neighbors_indices_for_upconv.data(), size_in_bytes);
+	memcpy(PYARRAY_DATA(res_indices_obj), neighbors_indices_for_upconv.data(), size_in_bytes);
 
 	if (use_feature)
 	{
 		size_in_bytes = subsampled_points.size() * fdim * sizeof(float);
 		res_features_obj = PyArray_SimpleNew(2, feature_dims, NPY_FLOAT);
-		memcpy(PyArray_DATA(res_features_obj), subsampled_features.data(), size_in_bytes);
+		memcpy(PYARRAY_DATA(res_features_obj), subsampled_features.data(), size_in_bytes);
 	}
 	if (use_classes)
 	{
 		size_in_bytes = subsampled_points.size() * ldim * sizeof(int);
 		res_classes_obj = PyArray_SimpleNew(2, classes_dims, NPY_INT);
-		memcpy(PyArray_DATA(res_classes_obj), subsampled_classes.data(), size_in_bytes);
+		memcpy(PYARRAY_DATA(res_classes_obj), subsampled_classes.data(), size_in_bytes);
 	}
 
 
@@ -705,7 +715,7 @@ static PyObject* cloud_subsampling(PyObject* self, PyObject* args, PyObject* key
 	}
 
 	// Check that the input array respect the dims
-	if ((int)PyArray_NDIM(points_array) != 2 || (int)PyArray_DIM(points_array, 1) != 3)
+	if ((int)PYARRAY_NDIM(points_array) != 2 || (int)PYARRAY_DIM(points_array, 1) != 3)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(classes_array);
@@ -713,7 +723,7 @@ static PyObject* cloud_subsampling(PyObject* self, PyObject* args, PyObject* key
 		PyErr_SetString(PyExc_RuntimeError, "Wrong dimensions : points.shape is not (N, 3)");
 		return NULL;
 	}
-	if (use_feature && ((int)PyArray_NDIM(features_array) != 2))
+	if (use_feature && ((int)PYARRAY_NDIM(features_array) != 2))
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(classes_array);
@@ -722,7 +732,7 @@ static PyObject* cloud_subsampling(PyObject* self, PyObject* args, PyObject* key
 		return NULL;
 	}
 
-	if (use_classes && (int)PyArray_NDIM(classes_array) > 2)
+	if (use_classes && (int)PYARRAY_NDIM(classes_array) > 2)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(classes_array);
@@ -732,20 +742,20 @@ static PyObject* cloud_subsampling(PyObject* self, PyObject* args, PyObject* key
 	}
 
 	// Number of points
-	int N = (int)PyArray_DIM(points_array, 0);
+	int N = (int)PYARRAY_DIM(points_array, 0);
 
 	// Dimension of the features
 	int fdim = 0;
 	if (use_feature)
-		fdim = (int)PyArray_DIM(features_array, 1);
+		fdim = (int)PYARRAY_DIM(features_array, 1);
 
 	//Dimension of labels
 	int ldim = 1;
-	if (use_classes && (int)PyArray_NDIM(classes_array) == 2)
-		ldim = (int)PyArray_DIM(classes_array, 1);
+	if (use_classes && (int)PYARRAY_NDIM(classes_array) == 2)
+		ldim = (int)PYARRAY_DIM(classes_array, 1);
 
 	// Check that the input array respect the number of points
-	if (use_feature && (int)PyArray_DIM(features_array, 0) != N)
+	if (use_feature && (int)PYARRAY_DIM(features_array, 0) != N)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(classes_array);
@@ -753,7 +763,7 @@ static PyObject* cloud_subsampling(PyObject* self, PyObject* args, PyObject* key
 		PyErr_SetString(PyExc_RuntimeError, "Wrong dimensions : features.shape is not (N, d)");
 		return NULL;
 	}
-	if (use_classes && (int)PyArray_DIM(classes_array, 0) != N)
+	if (use_classes && (int)PYARRAY_DIM(classes_array, 0) != N)
 	{
 		Py_XDECREF(points_array);
 		Py_XDECREF(classes_array);
@@ -775,11 +785,11 @@ static PyObject* cloud_subsampling(PyObject* self, PyObject* args, PyObject* key
 	vector<PointXYZ> original_points;
 	vector<float> original_features;
 	vector<int> original_classes;
-	original_points = vector<PointXYZ>((PointXYZ*)PyArray_DATA(points_array), (PointXYZ*)PyArray_DATA(points_array) + N);
+	original_points = vector<PointXYZ>((PointXYZ*)PYARRAY_DATA(points_array), (PointXYZ*)PYARRAY_DATA(points_array) + N);
 	if (use_feature)
-		original_features = vector<float>((float*)PyArray_DATA(features_array), (float*)PyArray_DATA(features_array) + N * fdim);
+		original_features = vector<float>((float*)PYARRAY_DATA(features_array), (float*)PYARRAY_DATA(features_array) + N * fdim);
 	if (use_classes)
-		original_classes = vector<int>((int*)PyArray_DATA(classes_array), (int*)PyArray_DATA(classes_array) + N * ldim);
+		original_classes = vector<int>((int*)PYARRAY_DATA(classes_array), (int*)PYARRAY_DATA(classes_array) + N * ldim);
 
 	// Subsample
 	vector<PointXYZ> subsampled_points;
@@ -823,18 +833,18 @@ static PyObject* cloud_subsampling(PyObject* self, PyObject* args, PyObject* key
 
 	// Fill output array with values
 	size_t size_in_bytes = subsampled_points.size() * 3 * sizeof(float);
-	memcpy(PyArray_DATA(res_points_obj), subsampled_points.data(), size_in_bytes);
+	memcpy(PYARRAY_DATA(res_points_obj), subsampled_points.data(), size_in_bytes);
 	if (use_feature)
 	{
 		size_in_bytes = subsampled_points.size() * fdim * sizeof(float);
 		res_features_obj = PyArray_SimpleNew(2, feature_dims, NPY_FLOAT);
-		memcpy(PyArray_DATA(res_features_obj), subsampled_features.data(), size_in_bytes);
+		memcpy(PYARRAY_DATA(res_features_obj), subsampled_features.data(), size_in_bytes);
 	}
 	if (use_classes)
 	{
 		size_in_bytes = subsampled_points.size() * ldim * sizeof(int);
 		res_classes_obj = PyArray_SimpleNew(2, classes_dims, NPY_INT);
-		memcpy(PyArray_DATA(res_classes_obj), subsampled_classes.data(), size_in_bytes);
+		memcpy(PYARRAY_DATA(res_classes_obj), subsampled_classes.data(), size_in_bytes);
 	}
 
 
